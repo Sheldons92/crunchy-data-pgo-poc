@@ -1,0 +1,19 @@
+# Deployment step
+deploy:
+  stage: deploy
+  image: ubuntu
+  before_script:
+    - apt-get update && apt-get install curl apt-transport-https gnupg -y
+    - curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+    - curl https://helm.baltorepo.com/organization/signing.asc | apt-key add -
+    - echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" | tee -a /etc/apt/sources.list.d/kubernetes.list
+    - echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list
+    - apt-get update && apt-get install helm kubectl -y
+  script:
+     - helm upgrade --install postgres-operator ./postgres-operator --kubeconfig=$kubeconfig_ops
+#     - helm upgrade --install metrics ./metrics --kubeconfig=$kubeconfig_ops
+     - kubectl --kubeconfig=$kubeconfig_ops -n pgo exec  $(kubectl --kubeconfig=$kubeconfig_ops get pod -n pgo -l name=pgo-client -o name) -it --  pgo create cluster -n pgo tooling-postgres --database=artifactory --username=root --password=$ARTIFACTORY_DB_PASSWORD
+     - kubectl --kubeconfig=$kubeconfig_ops create secret generic artifactory-postgres-credentials --from-literal=password=$ARTIFACTORY_DB_PASSWORD -n artifactory
+  environment:
+    name: dan-test-ops
+  when: manual
